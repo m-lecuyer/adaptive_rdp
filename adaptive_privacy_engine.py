@@ -142,7 +142,7 @@ class PrivacyOdometerEngine(AdaptivePrivacyEngine):
         super(PrivacyOdometerEngine, self).__init__(*args, **kwargs)
 
         self.delta = delta
-        self.gamma = np.log(2*len(self.alphas)/self.delta) / (np.atleast_1d(self.alphas)-1)
+        self.gamma = torch.tensor(np.log(2*len(self.alphas)/self.delta) / (np.atleast_1d(self.alphas)-1))
 
     def get_privacy_spent(self) -> Tuple[float, float]:
         """
@@ -164,7 +164,7 @@ class PrivacyOdometerEngine(AdaptivePrivacyEngine):
 
         rdp = torch.max(rdp, self.gamma)
         f = torch.ceil(torch.log2(rdp / self.gamma))
-        target_delta = self.target_delta / (len(self.alpjas)*2*torch.pow(f+1, 2))
+        target_delta = self.target_delta / (len(self.alphas)*2*torch.pow(f+1, 2))
         rdp = self.gamma * torch.exp2(f)
 
         return self.get_privacy_spent_heterogeneous_delta(torch.tensor(self.alphas), rdp, target_delta)

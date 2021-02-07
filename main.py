@@ -632,13 +632,13 @@ def main(args):
                 last_adaptive_metric_max = adaptive_metric
 
             steps_per_epoch = math.ceil(len(train_loader) / n_accumulation_steps)
-            can_go_up = args.move_down_period <= 0 or not privacy_engine.halt(steps=steps_per_epoch*args.move_down_period)
             additive = 0.
             if args.adaptive_strategy == 'down':
                 if not significant_increase:
                     # go down (less private) linearly
                     additive = args.adaptation_additive
             elif args.adaptive_strategy == 'updown':
+                can_go_up = args.move_down_period <= 0 or not privacy_engine.halt(steps=steps_per_epoch*args.move_down_period)
                 if significant_increase:
                     # go up (more private) linearly
                     if can_go_up:
