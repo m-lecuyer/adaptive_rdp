@@ -40,9 +40,6 @@ def get_rdp_eps(sigma, real_batch_size, steps, rdp_init=None):
     return eps, alpha, rdp
 
 def get_odom_eps(sigma, real_batch_size, steps, gamma=None, rdp_init=None):
-    if gamma is None:
-        gamma = get_rdp(sigma, real_batch_size, 1)
-
     rdp = get_rdp(sigma, real_batch_size, steps)
     if rdp_init is not None: rdp += rdp_init
 
@@ -81,72 +78,6 @@ def _get_privacy_spent(
 
     idx_opt = np.nanargmin(eps)  # Ignore NaNs
     return eps[idx_opt], orders_vec[idx_opt]
-
-def plot_odometer_curves(epochs):
-    dataset_size = 50000
-    batch_size = 512
-    steps_per_epoch = math.ceil(50000/512)
-
-    x = [0, 1, 100, 500] + list(range(1000, steps_per_epoch * epochs, 1000)) + [steps_per_epoch * epochs]
-
-    rdp_all = [get_rdp_eps(sigma=1, real_batch_size=batch_size, steps=step) for step in x]
-    rdp_eps = [x[0] for x in rdp_all]
-    rdp_alpha = [x[1] for x in rdp_all]
-
-    gamma = np.log(2*len(alphas)/1e-6)/(np.atleast_1d(alphas)-1)
-    odom_all = [get_odom_eps(sigma=1, real_batch_size=batch_size, steps=step, gamma=gamma) for step in x]
-    odom_eps = [x[0] for x in odom_all]
-    odom_alpha = [x[1] for x in odom_all]
-
-    gamma = .5
-    odom2_all = [get_odom_eps2(sigma=1, real_batch_size=batch_size, steps=step, gamma=gamma) for step in x]
-    odom2_eps = [x[0] for x in odom2_all]
-    odom2_alpha = [x[1] for x in odom2_all]
-
-    plt.figure(figsize=(6, 3.), tight_layout=True)
-    plt.plot(
-        x, rdp_eps,
-        "-", color=cycle_colors[0],
-        linewidth=linewidth, markersize=markersize,
-        label=r"$\epsilon_{RDP}$",
-    )
-    plt.plot(
-        x, odom_eps,
-        "-.", color=cycle_colors[1],
-        linewidth=linewidth, markersize=markersize,
-        label=r"Odometer",
-    )
-    plt.plot(
-        x, odom2_eps,
-        "-.", color=cycle_colors[2],
-        linewidth=linewidth, markersize=markersize,
-        label=r"Odometer 2",
-    )
-    plt.savefig("rdp_curve_odometer.pdf", bbox_inches='tight', pad_inches=0.0)
-    plt.clf()
-
-    plt.figure(figsize=(6, 3.), tight_layout=True)
-    plt.plot(
-        x, rdp_alpha,
-        "-", color=cycle_colors[0],
-        linewidth=linewidth, markersize=markersize,
-        label=r"$\epsilon_{RDP}$",
-    )
-    plt.plot(
-        x, odom_alpha,
-        "-.", color=cycle_colors[1],
-        linewidth=linewidth, markersize=markersize,
-        label=r"Odometer",
-    )
-    plt.plot(
-        x, odom2_alpha,
-        "-.", color=cycle_colors[2],
-        linewidth=linewidth, markersize=markersize,
-        label=r"Odometer 2",
-    )
-    plt.legend()
-    plt.savefig("alpha_curve_odometer.pdf", bbox_inches='tight', pad_inches=0.0)
-    plt.clf()
 
 def plot_finetune_results(path, keys, prefix=""):
     with open(path) as f:
@@ -252,7 +183,8 @@ def plot_adapt_noise_odom_eps(path, key, i):
     plt.figure(figsize=(3, 3.), tight_layout=True)
 
     for key in ['baseline_0', key]:
-        gamma = 6/(np.atleast_1d(alphas)-1)
+        gamma = 2**-2 * np.log(2*len(alphas)/1e-6) / (np.atleast_1d(alphas)-1)
+
         batch_size = data[key]['batch_size']
         steps = [math.ceil(50000/bs) for bs in batch_size]
         sigma = data[key]['sigma']
@@ -352,7 +284,7 @@ def plot_finetuning_odometer_curves(path, k_list, key_list, i_list, include_base
         data = json.loads(f.read())
 
     epochs = len(data[key_list[0]]['batch_size'])
-    gamma = 6/(np.atleast_1d(alphas)-1)
+    gamma = 2**-2 * np.log(2*len(alphas)/1e-6) / (np.atleast_1d(alphas)-1)
 
     plt.figure(figsize=(3, 3.), tight_layout=True)
     plt.ylim(bottom=0., top=9.5)
@@ -475,13 +407,13 @@ line_styles = {
 }
 
 if __name__ == "__main__":
-    plot_adapt_results("exp_results/adapt_exp.json", keys=['baseline', 'adapt_noise', 'adapt_batch'])
-    plot_adapt_batch_example("exp_results/adapt_exp.json", key='adapt_batch_1', i=2)
-    plot_adapt_noise_example("exp_results/adapt_exp.json", key='adapt_noise_3', i=1)
-    plot_adapt_noise_odom_eps("exp_results/adapt_exp.json", key='adapt_noise_3', i=1)
-    #
-    plot_finetune_results("exp_results/fine_tune_exp.json", keys=['fine_tune_last', 'fine_tune_all'], prefix="filter_")
-    plot_finetune_results("exp_results/fine_tune_adapt_exp.json", keys=['fine_tune_last', 'fine_tune_all'], prefix="adapt_")
-    plot_finetuning_odometer_curves("exp_results/fine_tune_exp.json", include_baseline=False, k_list=['fine_tune_last'], key_list=['fine_tune_last_0'], i_list=[0], prefix="early_stop_")
+    #  plot_adapt_results("exp_results/adapt_exp.json", keys=['baseline', 'adapt_noise', 'adapt_batch'])
+    #  plot_adapt_batch_example("exp_results/adapt_exp.json", key='adapt_batch_1', i=2)
+    #  plot_adapt_noise_example("exp_results/adapt_exp.json", key='adapt_noise_3', i=1)
+    #  plot_adapt_noise_odom_eps("exp_results/adapt_exp.json", key='adapt_noise_3', i=1)
+    #  #
+    #  plot_finetune_results("exp_results/fine_tune_exp.json", keys=['fine_tune_last', 'fine_tune_all'], prefix="filter_")
+    #  plot_finetune_results("exp_results/fine_tune_adapt_exp.json", keys=['fine_tune_last', 'fine_tune_all'], prefix="adapt_")
+    #  plot_finetuning_odometer_curves("exp_results/fine_tune_exp.json", include_baseline=False, k_list=['fine_tune_last'], key_list=['fine_tune_last_0'], i_list=[0], prefix="early_stop_")
     plot_finetuning_odometer_curves("exp_results/fine_tune_adapt_exp.json", k_list=['fine_tune_last'], key_list=['fine_tune_last_0'], i_list=[0], prefix="adaptive_")
 

@@ -33,8 +33,8 @@ For tensorbord logs:
 Run e.g.:
 
     # Adaptive training:
-	  python main.py -b 128 -na 4 --sigma 1 --filter 10 --adaptive noise --adaptive-metric train_acc --adaptive-strategy updown --maximum-factor 1. --adaptation-additive .1 --adaptation-period 10 --lr 0.05 --epochs 300 --wd 0 --model-type ResNet9 --log-dir ResNet9_adaptive
+	  python main.py -b 128 -na 4 --sigma 1 --filter 10 --adaptive noise --adaptive-metric train_acc --adaptive-strategy updown --maximum-factor 1. --adaptation-additive .1 --adaptation-period 10 --move-down-period 50 --lr 0.05 --epochs 300 --wd 0 --model-type ResNet9 --log-dir ResNet9_adaptive
 
     # Fine-tuning:
-    python main.py -b 64 -na 8 --sigma 2 --odometer --adaptive noise --adaptive-metric train_acc --adaptive-strategy down --maximum-factor .5 --adaptation-additive .1 --adaptation-period 1 --enable-bn --lr 0.01 --epochs 20 --wd 0 --model-type ResNet18 --fine-tune last --log-dir ResNet18_finetuning
+    python main.py -b 64 -na 8 --sigma 2 --odometer --adaptive noise --adaptive-metric train_acc --adaptive-strategy down --maximum-factor 2. --minimum_factor 1. --adaptation-additive .1 --adaptation-period 1 --enable-bn --lr 0.01 --epochs 20 --wd 0 --model-type ResNet18 --fine-tune last --log-dir ResNet18_finetuning
 

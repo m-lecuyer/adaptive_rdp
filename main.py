@@ -343,8 +343,8 @@ def get_args():
     parser.add_argument(
         "--move-down-period",
         type=int,
-        default=50,
-        help="Numer of epochs when adaptation can only go down (default 50). Set to -1 to disable",
+        default=-1,
+        help="Numer of epochs when adaptation can only go down (default -1). Set negative to disable",
     )
     parser.add_argument(
         "--adaptive-strategy",
@@ -540,8 +540,8 @@ def main(args):
         if args.filter is not None:
             privacy_engine = PrivacyFilterEngine(
                 args.filter,
-                args.delta,
                 model,
+                target_delta=args.delta,
                 batch_size=args.batch_size * args.n_accumulation_steps,
                 n_accumulation_steps=args.n_accumulation_steps,
                 sample_size=len(train_dataset),
@@ -553,8 +553,8 @@ def main(args):
             )
         elif args.odometer:
             privacy_engine = PrivacyOdometerEngine(
-                args.delta,
                 model,
+                target_delta=args.delta,
                 batch_size=args.batch_size * args.n_accumulation_steps,
                 n_accumulation_steps=args.n_accumulation_steps,
                 sample_size=len(train_dataset),
@@ -567,6 +567,7 @@ def main(args):
         else:
             privacy_engine = AdaptivePrivacyEngine(
                 model,
+                target_delta=args.delta,
                 batch_size=args.batch_size * args.n_accumulation_steps,
                 n_accumulation_steps=args.n_accumulation_steps,
                 sample_size=len(train_dataset),
@@ -631,6 +632,8 @@ def main(args):
             if significant_increase:
                 last_adaptive_metric_max = adaptive_metric
 
+            can_go_up = args.move_down_period <= 0 or not privacy_engine.halt(steps=steps_per_epoch*args.move_down_period)
+
             steps_per_epoch = math.ceil(len(train_loader) / n_accumulation_steps)
             additive = 0.
             if args.adaptive_strategy == 'down':
@@ -638,7 +641,6 @@ def main(args):
                     # go down (less private) linearly
                     additive = args.adaptation_additive
             elif args.adaptive_strategy == 'updown':
-                can_go_up = args.move_down_period <= 0 or not privacy_engine.halt(steps=steps_per_epoch*args.move_down_period)
                 if significant_increase:
                     # go up (more private) linearly
                     if can_go_up:

@@ -5,7 +5,6 @@ import os
 import types
 import warnings
 from typing import List, Optional, Tuple, Union
-import torch
 
 class AdaptivePrivacyEngine(PrivacyEngine):
     def __init__(self, *args, n_accumulation_steps=1, **kwargs):
@@ -36,12 +35,9 @@ class AdaptivePrivacyEngine(PrivacyEngine):
         self.steps = 0
 
     def get_renyi_divergence(self, sample_rate, noise_multiplier):
-        rdp = torch.tensor(
-            tf_privacy.compute_rdp(
-                sample_rate, noise_multiplier, 1, self.alphas
-            )
+        return tf_privacy.compute_rdp(
+            sample_rate, noise_multiplier, 1, self.alphas
         )
-        return rdp
 
     def add_query_to_ledger(self, sample_rate, noise_multiplier, n):
         privacy_ledger_key = (sample_rate, noise_multiplier)
@@ -75,10 +71,9 @@ class AdaptivePrivacyEngine(PrivacyEngine):
         return tf_privacy.get_privacy_spent(self.alphas, rdp, target_delta)
 
 class PrivacyFilterEngine(AdaptivePrivacyEngine):
-    def __init__(self, epsilon, delta, *args, **kwargs):
+    def __init__(self, epsilon, *args, **kwargs):
         super(PrivacyFilterEngine, self).__init__(*args, **kwargs)
         self.epsilon = epsilon
-        self.delta = delta
 
     def halt(
         self,
@@ -116,7 +111,7 @@ class PrivacyFilterEngine(AdaptivePrivacyEngine):
 
         self._commit_to_privacy_ledger()
         self.add_query_to_ledger(sample_rate, noise_multiplier, steps)
-        halt = self.get_privacy_spent(target_delta=self.delta)[0] > self.epsilon
+        halt = self.get_privacy_spent(target_delta=self.target_delta)[0] > self.epsilon
         self.add_query_to_ledger(sample_rate, noise_multiplier, -steps)
 
         return halt
@@ -128,21 +123,18 @@ class PrivacyFilterEngine(AdaptivePrivacyEngine):
 class PrivacyOdometerEngine(AdaptivePrivacyEngine):
     def __init__(
         self,
-        delta,
         *args,
         **kwargs,
     ):
         r"""
         Args:
-            delta: The target delta for the final (epsion, delta)-DP guarantee.
             *args: Arguments for the underlying PrivacyEngine. See
                 https://opacus.ai/api/privacy_engine.html.
             **kwargs: Keyword arguments for the underlying PrivacyEngine.
         """
         super(PrivacyOdometerEngine, self).__init__(*args, **kwargs)
 
-        self.delta = delta
-        self.gamma = torch.tensor(np.log(2*len(self.alphas)/self.delta) / (np.atleast_1d(self.alphas)-1))
+        self.gamma = 2**-2 * np.log(2*len(self.alphas)/self.target_delta) / (np.atleast_1d(self.alphas)-1)
 
     def get_privacy_spent(self) -> Tuple[float, float]:
         """
@@ -162,12 +154,12 @@ class PrivacyOdometerEngine(AdaptivePrivacyEngine):
         for (sample_rate, noise_multiplier), steps in self.privacy_ledger.items():
             rdp += self.get_renyi_divergence(sample_rate, noise_multiplier) * steps
 
-        rdp = torch.max(rdp, self.gamma)
-        f = torch.ceil(torch.log2(rdp / self.gamma))
-        target_delta = self.target_delta / (len(self.alphas)*2*torch.pow(f+1, 2))
-        rdp = self.gamma * torch.exp2(f)
+        rdp = np.maximum(rdp, self.gamma)
+        f = np.ceil(np.log2(rdp / self.gamma))
+        target_delta = self.target_delta / (len(self.alphas)*2*np.power(f+1, 2))
+        rdp = self.gamma * np.exp2(f)
 
-        return self.get_privacy_spent_heterogeneous_delta(torch.tensor(self.alphas), rdp, target_delta)
+        return self.get_privacy_spent_heterogeneous_delta(self.alphas, rdp, target_delta)
 
     def get_privacy_spent_heterogeneous_delta(
         self, orders: Union[List[float], float], rdp: Union[List[float], float], delta: Union[List[float], float],
@@ -196,11 +188,7 @@ class PrivacyOdometerEngine(AdaptivePrivacyEngine):
                 f"\tdelta_vec = {delta_vec}\n"
             )
 
-        rdp_vec = torch.tensor(rdp_vec)
-        delta = torch.tensor(delta)
-        orders_vec = torch.tensor(orders_vec)
-
-        eps = (rdp_vec - torch.log(delta) / (orders_vec - 1)).detach()
+        eps = rdp_vec - np.log(delta) / (orders_vec - 1)
 
         # special case when there is no privacy
         if np.isnan(eps).all():
